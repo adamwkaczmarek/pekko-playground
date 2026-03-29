@@ -1,35 +1,35 @@
 # Pekko Playground
 
-Repozytorium z przykładami uczącymi [Apache Pekko](https://pekko.apache.org/) Cluster.
-Każdy przykład to osobny podmoduł SBT z własnym kodem, konfiguracją i instrukcją uruchomienia.
+A collection of examples for learning [Apache Pekko](https://pekko.apache.org/) Cluster.
+Each example is a separate SBT submodule with its own code, configuration, and run instructions.
 
 ---
 
-## Podmoduły
+## Submodules
 
-| Podmoduł | Opis |
+| Submodule | Description |
 |---|---|
-| [01-cluster-basics](01-cluster-basics/README.md) | Formowanie klastra, Cluster Sharding, Split Brain Resolver, Management HTTP |
-| [02-microservices](02-microservices/README.md)   | Dwa niezależne klastry (UserService + OrderService) komunikujące się przez HTTP |
+| [01-cluster-basics](01-cluster-basics/README.md) | Cluster formation, Cluster Sharding, Split Brain Resolver, Management HTTP |
+| [02-microservices](02-microservices/README.md)   | Two independent clusters (UserService + OrderService) communicating over HTTP |
 
 ---
 
-## Wymagania
+## Requirements
 
 - JDK 17+
 - sbt 1.9+
-- Docker (opcjonalnie, do deploymentu na Minikube)
+- Docker (optional, for Minikube deployment)
 
 ---
 
-## Uruchomienie
+## Running
 
 ```bash
-# Kompilacja wszystkich podmodułów
+# Compile all submodules
 sbt compile
 
-# Uruchomienie konkretnego podmodułu
+# Run a specific submodule
 sbt "01-cluster-basics/run"
 ```
 
-Szczegółowe instrukcje uruchomienia znajdziesz w README każdego podmodułu.
+Detailed run instructions are in each submodule's README.
