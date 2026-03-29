@@ -1,0 +1,120 @@
+# =============================================================================
+# OrderService — Kubernetes resources
+# =============================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-service
+  namespace: pekko-demo
+  labels:
+    app: order-service
+spec:
+  selector:
+    app: order-service
+  ports:
+    - name: http
+      port: 8082
+      targetPort: http
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-service-mgmt
+  namespace: pekko-demo
+  labels:
+    app: order-service
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port:   "8568"
+    prometheus.io/path:   "/metrics"
+spec:
+  selector:
+    app: order-service
+  ports:
+    - name: management
+      port: 8568
+      targetPort: management
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service
+  namespace: pekko-demo
+  labels:
+    app: order-service
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: order-service
+  template:
+    metadata:
+      labels:
+        app: order-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port:   "9010"
+        prometheus.io/path:   "/metrics"
+    spec:
+      serviceAccountName: pekko-app
+
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: order-service
+
+      containers:
+        - name: order-service
+          image: pekko-microservices:latest
+          imagePullPolicy: Never
+
+          env:
+            - name: SERVICE_NAME
+              value: order-service
+            - name: CONFIG_RESOURCE
+              value: kubernetes-order-service
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+
+          ports:
+            - name: http
+              containerPort: 8082
+            - name: management
+              containerPort: 8568
+            - name: jmx-exporter
+              containerPort: 9010
+            - name: artery
+              containerPort: 25520
+              protocol: TCP
+
+          readinessProbe:
+            httpGet:
+              path:   /ready
+              port:   management
+            initialDelaySeconds: 20
+            periodSeconds:        10
+            failureThreshold:     10
+
+          livenessProbe:
+            httpGet:
+              path:   /alive
+              port:   management
+            initialDelaySeconds: 60
+            periodSeconds:        15
+            failureThreshold:      5
+
+          resources:
+            requests:
+              cpu:    "250m"
+              memory: "384Mi"
+            limits:
+              cpu:    "1"
+              memory: "512Mi"

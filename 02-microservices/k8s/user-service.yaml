@@ -1,0 +1,134 @@
+# =============================================================================
+# UserService — Kubernetes resources
+#
+# Two services:
+#   user-service         ClusterIP  port 8081 — HTTP API, used by OrderService + Frontend
+#   user-service-mgmt    ClusterIP  port 8558 — Pekko Management (cluster state, health)
+# One Deployment with 3 replicas to demonstrate shard distribution across nodes.
+# =============================================================================
+
+# ── HTTP API service (used by other services) ─────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-service
+  namespace: pekko-demo
+  labels:
+    app: user-service
+spec:
+  selector:
+    app: user-service
+  ports:
+    - name: http
+      port: 8081
+      targetPort: http
+  type: ClusterIP
+---
+# ── Management service (Prometheus scrape + health checks) ────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-service-mgmt
+  namespace: pekko-demo
+  labels:
+    app: user-service
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port:   "8558"
+    prometheus.io/path:   "/metrics"
+spec:
+  selector:
+    app: user-service
+  # ClusterIP (not headless) — we access management per-pod via POD_IP directly;
+  # this service is mainly for Prometheus scraping
+  ports:
+    - name: management
+      port: 8558
+      targetPort: management
+  type: ClusterIP
+---
+# ── Deployment ────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service
+  namespace: pekko-demo
+  labels:
+    app: user-service
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: user-service
+  template:
+    metadata:
+      labels:
+        app: user-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port:   "9010"
+        prometheus.io/path:   "/metrics"
+    spec:
+      serviceAccountName: pekko-app
+
+      # Spread replicas across nodes for realistic sharding behaviour
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: user-service
+
+      containers:
+        - name: user-service
+          image: pekko-microservices:latest
+          # Use local Minikube image — never pull from a remote registry
+          imagePullPolicy: Never
+
+          env:
+            - name: SERVICE_NAME
+              value: user-service
+            - name: CONFIG_RESOURCE
+              value: kubernetes-user-service
+            # POD_IP is passed to pekko.remote.artery.canonical.hostname via config substitution
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+
+          ports:
+            - name: http
+              containerPort: 8081
+            - name: management
+              containerPort: 8558
+            - name: jmx-exporter
+              containerPort: 9010
+            - name: artery
+              containerPort: 25510
+              protocol: TCP
+
+          # Readiness: wait for cluster bootstrap to complete before receiving traffic
+          readinessProbe:
+            httpGet:
+              path:   /ready
+              port:   management
+            initialDelaySeconds: 20
+            periodSeconds:        10
+            failureThreshold:     10
+
+          livenessProbe:
+            httpGet:
+              path:   /alive
+              port:   management
+            initialDelaySeconds: 60
+            periodSeconds:        15
+            failureThreshold:      5
+
+          resources:
+            requests:
+              cpu:    "250m"
+              memory: "384Mi"
+            limits:
+              cpu:    "1"
+              memory: "512Mi"

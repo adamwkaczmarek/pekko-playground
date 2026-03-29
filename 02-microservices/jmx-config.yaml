@@ -1,0 +1,59 @@
+---
+# JMX Prometheus exporter config
+# Scraped by Prometheus Operator on port 9010 via PodMonitor (k8s/podmonitors.yaml).
+#
+# Strategy:
+#   - Explicit rules for Pekko sharding beans so they get clean metric names + labels.
+#   - Catch-all  pattern: ".*"  for everything else — auto-generates names from MBean paths.
+#
+# Auto-generated names produced by the catch-all (with lowercaseOutputName: true):
+#   java_lang_memory_heapmemoryusage_used / _max / _committed / _init
+#   java_lang_memory_nonheapmemoryusage_used / _max
+#   java_lang_threading_threadcount / daemonthreadcount
+#   java_lang_garbagecollector_g1_young_generation_collectioncount  (gc name embedded)
+#   java_lang_garbagecollector_g1_young_generation_collectiontime
+#   java_lang_operatingsystem_processcpuload / openfiledescriptorcount
+
+startDelaySeconds: 0
+ssl: false
+lowercaseOutputName: true
+lowercaseOutputLabelNames: true
+
+rules:
+  # ── Pekko Cluster Sharding ───────────────────────────────────────────────────
+  # Explicit rules so sharding metrics get clean names and entity_type label.
+  # Both property orderings listed — actual order depends on JVM registration order
+  # vs. canonical (alphabetical) order and varies between JVM versions.
+
+  - pattern: '(\w+)<type=sharding, name=(.+)-region><>NumberOfShards'
+    name: pekko_sharding_shards_per_node
+    type: GAUGE
+    labels:
+      actor_system: "$1"
+      entity_type:  "$2"
+
+  - pattern: '(\w+)<name=(.+)-region, type=sharding><>NumberOfShards'
+    name: pekko_sharding_shards_per_node
+    type: GAUGE
+    labels:
+      actor_system: "$1"
+      entity_type:  "$2"
+
+  - pattern: '(\w+)<type=sharding, name=(.+)-region><>NumberOfEntities'
+    name: pekko_sharding_entities_per_node
+    type: GAUGE
+    labels:
+      actor_system: "$1"
+      entity_type:  "$2"
+
+  - pattern: '(\w+)<name=(.+)-region, type=sharding><>NumberOfEntities'
+    name: pekko_sharding_entities_per_node
+    type: GAUGE
+    labels:
+      actor_system: "$1"
+      entity_type:  "$2"
+
+  # ── Everything else ──────────────────────────────────────────────────────────
+  # Matches all remaining JMX beans and auto-generates metric names.
+  # No property-ordering assumptions — works regardless of JVM version.
+  - pattern: ".*"

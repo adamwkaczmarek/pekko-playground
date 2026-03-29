@@ -1,0 +1,85 @@
+# =============================================================================
+# PodMonitors — tell the Prometheus Operator to scrape JMX metrics from
+# all pekko-demo pods on port 9010 (jmx-exporter).
+#
+# kube-prometheus-stack uses the Prometheus Operator, which does NOT respect
+# prometheus.io/scrape pod annotations. Scraping must be configured via
+# PodMonitor or ServiceMonitor CRDs.
+#
+# The label  release: kube-prometheus-stack  must match the Prometheus CR's
+# podMonitorSelector so the Operator picks this up.
+# =============================================================================
+
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: pekko-backend
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - pekko-demo
+  selector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values: [user-service, order-service]
+  podMetricsEndpoints:
+    # JVM metrics (JMX exporter)
+    - port: jmx-exporter
+      path: /metrics
+      interval: 15s
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+    # HTTP throughput metrics (pekko-http-metrics-prometheus, exposed on the service HTTP port)
+    - port: http
+      path: /metrics
+      interval: 10s
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        - sourceLabels: [__meta_kubernetes_pod_label_app]
+          targetLabel: service
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: pekko-frontend
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - pekko-demo
+  selector:
+    matchLabels:
+      app: frontend
+  podMetricsEndpoints:
+    # JVM metrics (JMX exporter)
+    - port: jmx-exporter
+      path: /metrics
+      interval: 15s
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+    # HTTP throughput metrics
+    - port: http
+      path: /metrics
+      interval: 10s
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        - sourceLabels: [__meta_kubernetes_pod_label_app]
+          targetLabel: service
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace

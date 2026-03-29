@@ -1,0 +1,70 @@
+# JMX Prometheus Exporter configuration
+# Captures standard JVM metrics + Pekko-specific MBeans.
+# Served on port 9090 (see Dockerfile).
+
+startDelaySeconds: 0
+ssl: false
+lowercaseOutputName: true
+lowercaseOutputLabelNames: true
+
+rules:
+
+  # ---- JVM Memory -----------------------------------------------------------
+  - pattern: 'java.lang<type=Memory><HeapMemoryUsage>(\w+)'
+    name: jvm_memory_heap_$1_bytes
+    type: GAUGE
+    help: JVM heap memory in bytes
+
+  - pattern: 'java.lang<type=Memory><NonHeapMemoryUsage>(\w+)'
+    name: jvm_memory_nonheap_$1_bytes
+    type: GAUGE
+
+  - pattern: 'java.lang<type=MemoryPool, name=(.+)><Usage>(\w+)'
+    name: jvm_memory_pool_$2_bytes
+    type: GAUGE
+    labels:
+      pool: $1
+
+  # ---- GC -------------------------------------------------------------------
+  - pattern: 'java.lang<type=GarbageCollector, name=(.+)><>CollectionCount'
+    name: jvm_gc_collection_total
+    type: COUNTER
+    labels:
+      gc: $1
+
+  - pattern: 'java.lang<type=GarbageCollector, name=(.+)><>CollectionTime'
+    name: jvm_gc_collection_seconds_total
+    type: COUNTER
+    labels:
+      gc: $1
+    valueFactor: 0.001
+
+  # ---- Threads --------------------------------------------------------------
+  - pattern: 'java.lang<type=Threading><>(.+ThreadCount|ThreadCount)'
+    name: jvm_threads_$1
+    type: GAUGE
+
+  # ---- CPU ------------------------------------------------------------------
+  - pattern: 'java.lang<type=OperatingSystem><>(ProcessCpuLoad|SystemCpuLoad)'
+    name: jvm_os_$1
+    type: GAUGE
+
+  # ---- Pekko Dispatchers ----------------------------------------------------
+  # Pekko exposes dispatcher metrics under:
+  #   org.apache.pekko:type=Dispatchers,actorSystem=<name>,dispatcher=<name>
+  - pattern: 'org.apache.pekko<type=Dispatchers, actorSystem=(.+), dispatcher=(.+)><>(.+)'
+    name: pekko_dispatcher_$3
+    type: GAUGE
+    labels:
+      system: $1
+      dispatcher: $2
+
+  # ---- Pekko Actor Mailboxes ------------------------------------------------
+  - pattern: 'org.apache.pekko<type=ActorSystems, actorSystem=(.+)><>(.+)'
+    name: pekko_actorsystem_$2
+    type: GAUGE
+    labels:
+      system: $1
+
+  # ---- Catch-all: export everything else with a generic rule ----------------
+  - pattern: '.*'

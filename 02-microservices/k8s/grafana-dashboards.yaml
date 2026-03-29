@@ -1,0 +1,1042 @@
+# =============================================================================
+# Grafana dashboards — loaded automatically by the kube-prometheus-stack
+# sidecar which watches ConfigMaps labelled grafana_dashboard=1 in the
+# monitoring namespace.
+#
+# Four dashboards:
+#   pekko-logs-v1     — Loki: log rates, error rates, shard events, member events
+#   pekko-metrics-v1  — Prometheus: pod counts, CPU, memory, JVM heap, GC, network
+#   pekko-sharding-v1 — Prometheus (JMX) + Loki: shards/entities per node, rebalancing
+#   pekko-http-v1     — Prometheus: requests/s, latency percentiles, error rate, active requests
+# =============================================================================
+
+# ── Dashboard 1: Logs & Events (Loki) ────────────────────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pekko-logs-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  pekko-logs.json: |
+    {
+      "annotations": {"list": []},
+      "description": "Application logs and cluster events — pekko-demo namespace",
+      "editable": true,
+      "graphTooltip": 1,
+      "links": [],
+      "panels": [
+        {
+          "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {
+                "drawStyle": "line", "fillOpacity": 15, "lineWidth": 1,
+                "showPoints": "never", "spanNulls": true,
+                "stacking": {"group": "A", "mode": "none"}
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+          "id": 1,
+          "options": {
+            "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+            "tooltip": {"mode": "multi", "sort": "none"}
+          },
+          "targets": [{
+            "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+            "expr": "sum by (app) (rate({namespace=\"pekko-demo\", app=~\".+\"}[$__interval]))",
+            "legendFormat": "{{app}}",
+            "queryType": "range",
+            "refId": "A"
+          }],
+          "title": "Log Rate by Service (lines/s)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {
+                "drawStyle": "line", "fillOpacity": 15, "lineWidth": 2,
+                "showPoints": "never", "spanNulls": true,
+                "stacking": {"group": "A", "mode": "none"}
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+          "id": 2,
+          "options": {
+            "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+            "tooltip": {"mode": "multi", "sort": "none"}
+          },
+          "targets": [{
+            "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+            "expr": "sum by (app) (rate({namespace=\"pekko-demo\", app=~\".+\"} |~ \"ERROR|WARN\" [$__interval]))",
+            "legendFormat": "{{app}}",
+            "queryType": "range",
+            "refId": "A"
+          }],
+          "title": "Error / Warn Rate by Service (lines/s)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+          "gridPos": {"h": 10, "w": 12, "x": 0, "y": 8},
+          "id": 3,
+          "options": {
+            "dedupStrategy": "none",
+            "enableLogDetails": true,
+            "prettifyLogMessage": false,
+            "showCommonLabels": false,
+            "showLabels": false,
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": true
+          },
+          "targets": [{
+            "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+            "expr": "{namespace=\"pekko-demo\"} |~ \"[Ss]hard|[Rr]ebalanc|entityId|[Ss]tarted entity\"",
+            "queryType": "range",
+            "refId": "A"
+          }],
+          "title": "Shard & Entity Events",
+          "type": "logs"
+        },
+        {
+          "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+          "gridPos": {"h": 10, "w": 12, "x": 12, "y": 8},
+          "id": 4,
+          "options": {
+            "dedupStrategy": "none",
+            "enableLogDetails": true,
+            "prettifyLogMessage": false,
+            "showCommonLabels": false,
+            "showLabels": false,
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": true
+          },
+          "targets": [{
+            "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+            "expr": "{namespace=\"pekko-demo\"} |~ \"ClusterBootstrap|Joining|MemberUp|MemberRemoved|seed-node|[Rr]eachab\"",
+            "queryType": "range",
+            "refId": "A"
+          }],
+          "title": "Cluster Member & Bootstrap Events",
+          "type": "logs"
+        },
+        {
+          "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+          "gridPos": {"h": 14, "w": 24, "x": 0, "y": 18},
+          "id": 5,
+          "options": {
+            "dedupStrategy": "none",
+            "enableLogDetails": true,
+            "prettifyLogMessage": false,
+            "showCommonLabels": false,
+            "showLabels": true,
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": false
+          },
+          "targets": [{
+            "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+            "expr": "{namespace=\"pekko-demo\", app=~\"$service\"}",
+            "queryType": "range",
+            "refId": "A"
+          }],
+          "title": "Application Logs  [ filter: $service ]",
+          "type": "logs"
+        }
+      ],
+      "refresh": "10s",
+      "schemaVersion": 38,
+      "tags": ["pekko", "loki"],
+      "templating": {
+        "list": [
+          {
+            "current": {},
+            "hide": 0,
+            "includeAll": false,
+            "label": "Loki",
+            "multi": false,
+            "name": "DS_LOKI",
+            "options": [],
+            "query": "loki",
+            "refresh": 1,
+            "type": "datasource"
+          },
+          {
+            "allValue": ".+",
+            "current": {"selected": true, "text": "All", "value": "$__all"},
+            "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+            "definition": "label_values({namespace=\"pekko-demo\"}, app)",
+            "hide": 0,
+            "includeAll": true,
+            "label": "Service",
+            "multi": true,
+            "name": "service",
+            "options": [],
+            "query": "label_values({namespace=\"pekko-demo\"}, app)",
+            "refresh": 2,
+            "sort": 1,
+            "type": "query"
+          }
+        ]
+      },
+      "time": {"from": "now-30m", "to": "now"},
+      "timepicker": {},
+      "timezone": "browser",
+      "title": "Pekko \u2014 Logs & Events",
+      "uid": "pekko-logs-v1",
+      "version": 1
+    }
+---
+# ── Dashboard 2: Cluster & JVM Metrics (Prometheus) ──────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pekko-metrics-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  pekko-metrics.json: |
+    {
+      "annotations": {"list": []},
+      "description": "Container metrics (cAdvisor) + JVM metrics (JMX exporter) for pekko-demo services",
+      "editable": true,
+      "graphTooltip": 1,
+      "links": [],
+      "panels": [
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "thresholds"},
+              "thresholds": {"mode": "absolute", "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 1},
+                {"color": "green", "value": 3}
+              ]},
+              "unit": "short", "noValue": "0"
+            },
+            "overrides": []
+          },
+          "gridPos": {"h": 4, "w": 8, "x": 0, "y": 0},
+          "id": 1,
+          "options": {
+            "colorMode": "background", "graphMode": "none",
+            "justifyMode": "center", "orientation": "auto",
+            "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+            "textMode": "auto"
+          },
+          "targets": [{"datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+            "expr": "count(kube_pod_status_phase{namespace=\"pekko-demo\", phase=\"Running\", pod=~\"user-service.*\"})",
+            "legendFormat": "running", "refId": "A"}],
+          "title": "UserService — Running Pods",
+          "type": "stat"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "thresholds"},
+              "thresholds": {"mode": "absolute", "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 1},
+                {"color": "green", "value": 3}
+              ]},
+              "unit": "short", "noValue": "0"
+            },
+            "overrides": []
+          },
+          "gridPos": {"h": 4, "w": 8, "x": 8, "y": 0},
+          "id": 2,
+          "options": {
+            "colorMode": "background", "graphMode": "none",
+            "justifyMode": "center", "orientation": "auto",
+            "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+            "textMode": "auto"
+          },
+          "targets": [{"datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+            "expr": "count(kube_pod_status_phase{namespace=\"pekko-demo\", phase=\"Running\", pod=~\"order-service.*\"})",
+            "legendFormat": "running", "refId": "A"}],
+          "title": "OrderService — Running Pods",
+          "type": "stat"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "thresholds"},
+              "thresholds": {"mode": "absolute", "steps": [
+                {"color": "red", "value": null},
+                {"color": "green", "value": 1}
+              ]},
+              "unit": "short", "noValue": "0"
+            },
+            "overrides": []
+          },
+          "gridPos": {"h": 4, "w": 8, "x": 16, "y": 0},
+          "id": 3,
+          "options": {
+            "colorMode": "background", "graphMode": "none",
+            "justifyMode": "center", "orientation": "auto",
+            "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+            "textMode": "auto"
+          },
+          "targets": [{"datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+            "expr": "count(kube_pod_status_phase{namespace=\"pekko-demo\", phase=\"Running\", pod=~\"frontend.*\"})",
+            "legendFormat": "running", "refId": "A"}],
+          "title": "Frontend — Running Pods",
+          "type": "stat"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 1, "showPoints": "never", "spanNulls": true},
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+          "id": 4,
+          "options": {
+            "legend": {"displayMode": "list", "placement": "right", "showLegend": true},
+            "tooltip": {"mode": "multi", "sort": "none"}
+          },
+          "targets": [{"datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+            "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"pekko-demo\"}[$__rate_interval]))",
+            "legendFormat": "{{pod}}", "refId": "A"}],
+          "title": "CPU Usage per Pod (cores)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 1, "showPoints": "never", "spanNulls": true},
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+          "id": 5,
+          "options": {
+            "legend": {"displayMode": "list", "placement": "right", "showLegend": true},
+            "tooltip": {"mode": "multi", "sort": "none"}
+          },
+          "targets": [{"datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+            "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"pekko-demo\"})",
+            "legendFormat": "{{pod}}", "refId": "A"}],
+          "title": "Memory (Working Set) per Pod",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 1, "showPoints": "never", "spanNulls": true},
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+          "id": 6,
+          "options": {
+            "legend": {"displayMode": "list", "placement": "right", "showLegend": true},
+            "tooltip": {"mode": "multi", "sort": "none"}
+          },
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+              "expr": "java_lang_memory_heapmemoryusage_used{pod=~\"(user-service|order-service|frontend).*\"}",
+              "legendFormat": "heap used — {{pod}}", "refId": "A"
+            },
+            {
+              "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+              "expr": "java_lang_memory_heapmemoryusage_max{pod=~\"(user-service|order-service|frontend).*\"}",
+              "legendFormat": "heap max — {{pod}}", "refId": "B"
+            }
+          ],
+          "title": "JVM Heap Memory per Pod",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 1, "showPoints": "never", "spanNulls": true},
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+          "id": 7,
+          "options": {
+            "legend": {"displayMode": "list", "placement": "right", "showLegend": true},
+            "tooltip": {"mode": "multi", "sort": "none"}
+          },
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+              "expr": "java_lang_threading_threadcount{pod=~\"(user-service|order-service|frontend).*\"}",
+              "legendFormat": "total — {{pod}}", "refId": "A"
+            },
+            {
+              "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+              "expr": "java_lang_threading_daemonthreadcount{pod=~\"(user-service|order-service|frontend).*\"}",
+              "legendFormat": "daemon — {{pod}}", "refId": "B"
+            }
+          ],
+          "title": "JVM Thread Count per Pod",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {"drawStyle": "line", "fillOpacity": 5, "lineWidth": 1, "showPoints": "never", "spanNulls": true},
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+          "id": 8,
+          "options": {
+            "legend": {"displayMode": "list", "placement": "right", "showLegend": true},
+            "tooltip": {"mode": "multi", "sort": "none"}
+          },
+          "targets": [{"datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+            "expr": "sum by (pod) (rate(jvm_gc_collection_seconds_sum{pod=~\"(user-service|order-service|frontend).*\"}[$__rate_interval]))",
+            "legendFormat": "{{pod}}", "refId": "A"}],
+          "title": "GC Time Rate per Pod (s/s)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {"drawStyle": "line", "fillOpacity": 5, "lineWidth": 1, "showPoints": "never", "spanNulls": true},
+              "unit": "Bps"
+            },
+            "overrides": []
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+          "id": 9,
+          "options": {
+            "legend": {"displayMode": "list", "placement": "right", "showLegend": true},
+            "tooltip": {"mode": "multi", "sort": "none"}
+          },
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+              "expr": "sum by (service) (rate(pekko_http_requests_size_bytes_sum{namespace=\"pekko-demo\"}[$__rate_interval]))",
+              "legendFormat": "rx \u2193 {{service}}", "refId": "A"
+            },
+            {
+              "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+              "expr": "sum by (service) (rate(pekko_http_responses_size_bytes_sum{namespace=\"pekko-demo\"}[$__rate_interval]))",
+              "legendFormat": "tx \u2191 {{service}}", "refId": "B"
+            }
+          ],
+          "title": "HTTP Bandwidth per Service (request/response body bytes)",
+          "type": "timeseries"
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 38,
+      "tags": ["pekko", "prometheus"],
+      "templating": {
+        "list": [
+          {
+            "current": {},
+            "hide": 0,
+            "includeAll": false,
+            "label": "Prometheus",
+            "multi": false,
+            "name": "DS_PROMETHEUS",
+            "options": [],
+            "query": "prometheus",
+            "refresh": 1,
+            "type": "datasource"
+          }
+        ]
+      },
+      "time": {"from": "now-1h", "to": "now"},
+      "timepicker": {},
+      "timezone": "browser",
+      "title": "Pekko \u2014 Cluster & JVM Metrics",
+      "uid": "pekko-metrics-v1",
+      "version": 1
+    }
+---
+# ── Dashboard 3: Shard Distribution (Prometheus/JMX + custom metrics) ────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pekko-sharding-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  pekko-sharding.json: |
+    {
+      "annotations": {"list": []},
+      "description": "Shard and entity distribution across cluster nodes — JMX metrics + custom Prometheus counters",
+      "editable": true,
+      "graphTooltip": 1,
+      "links": [],
+      "panels": [
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {
+                "drawStyle": "line", "fillOpacity": 20, "lineWidth": 2,
+                "showPoints": "always", "pointSize": 6, "spanNulls": true,
+                "stacking": {"group": "A", "mode": "none"}
+              },
+              "unit": "short",
+              "min": 0
+            },
+            "overrides": []
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+          "id": 1,
+          "options": {
+            "legend": {"displayMode": "table", "placement": "right", "showLegend": true,
+              "calcs": ["lastNotNull", "max"]},
+            "tooltip": {"mode": "multi", "sort": "none"}
+          },
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+              "expr": "pekko_sharding_shards_per_node{entity_type=~\"$entity_type\"}",
+              "legendFormat": "{{pod}} / {{entity_type}}",
+              "refId": "A"
+            }
+          ],
+          "title": "Shards per Node  (pekko_sharding_shards_per_node)",
+          "description": "How many shards each pod is currently hosting. Equal distribution means good load balancing. Spikes indicate rebalancing in progress.",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {
+                "drawStyle": "line", "fillOpacity": 20, "lineWidth": 2,
+                "showPoints": "always", "pointSize": 6, "spanNulls": true
+              },
+              "unit": "short",
+              "min": 0
+            },
+            "overrides": []
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+          "id": 2,
+          "options": {
+            "legend": {"displayMode": "table", "placement": "right", "showLegend": true,
+              "calcs": ["lastNotNull", "max"]},
+            "tooltip": {"mode": "multi", "sort": "none"}
+          },
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+              "expr": "pekko_sharding_entities_per_node{entity_type=~\"$entity_type\"}",
+              "legendFormat": "{{pod}} / {{entity_type}}",
+              "refId": "A"
+            }
+          ],
+          "title": "Entity Actors per Node  (pekko_sharding_entities_per_node)",
+          "description": "Live entity actors on each pod. After passivation timeout actors are stopped and the count drops. A hot pod with many actors may indicate skewed shard allocation.",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "thresholds"},
+              "thresholds": {"mode": "absolute", "steps": [
+                {"color": "blue", "value": null}
+              ]},
+              "unit": "short",
+              "noValue": "0"
+            },
+            "overrides": []
+          },
+          "gridPos": {"h": 4, "w": 6, "x": 0, "y": 8},
+          "id": 3,
+          "options": {
+            "colorMode": "background", "graphMode": "none",
+            "justifyMode": "center", "orientation": "auto",
+            "reduceOptions": {"calcs": ["sum"], "fields": "", "values": false},
+            "textMode": "auto"
+          },
+          "targets": [{
+            "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+            "expr": "sum(pekko_sharding_shards_per_node{entity_type=\"User\"})",
+            "legendFormat": "", "refId": "A"
+          }],
+          "title": "Total Shards — User",
+          "description": "Total active User shards summed across all nodes. Pekko partitions the entity key space into virtual shards (default 1000). A shard becomes active when it hosts at least one message or actor. The value grows gradually as new users receive their first request.",
+          "type": "stat"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "thresholds"},
+              "thresholds": {"mode": "absolute", "steps": [
+                {"color": "blue", "value": null}
+              ]},
+              "unit": "short",
+              "noValue": "0"
+            },
+            "overrides": []
+          },
+          "gridPos": {"h": 4, "w": 6, "x": 6, "y": 8},
+          "id": 4,
+          "options": {
+            "colorMode": "background", "graphMode": "none",
+            "justifyMode": "center", "orientation": "auto",
+            "reduceOptions": {"calcs": ["sum"], "fields": "", "values": false},
+            "textMode": "auto"
+          },
+          "targets": [{
+            "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+            "expr": "sum(pekko_sharding_entities_per_node{entity_type=\"User\"})",
+            "legendFormat": "", "refId": "A"
+          }],
+          "title": "Total Live Entity Actors — User",
+          "description": "Total live User actor instances across the entire cluster. Each actor = one active user. Actors are stopped after 2 min of inactivity (passivation) — the count drops when that happens. High values indicate many concurrent sessions.",
+          "type": "stat"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "thresholds"},
+              "thresholds": {"mode": "absolute", "steps": [
+                {"color": "green", "value": null}
+              ]},
+              "unit": "short",
+              "noValue": "0"
+            },
+            "overrides": []
+          },
+          "gridPos": {"h": 4, "w": 6, "x": 12, "y": 8},
+          "id": 5,
+          "options": {
+            "colorMode": "background", "graphMode": "none",
+            "justifyMode": "center", "orientation": "auto",
+            "reduceOptions": {"calcs": ["sum"], "fields": "", "values": false},
+            "textMode": "auto"
+          },
+          "targets": [{
+            "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+            "expr": "sum(pekko_sharding_shards_per_node{entity_type=\"Order\"})",
+            "legendFormat": "", "refId": "A"
+          }],
+          "title": "Total Shards — Order",
+          "description": "Total active Order shards summed across all nodes. Same as for User — a shard becomes active when the first order assigned to it is processed.",
+          "type": "stat"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "thresholds"},
+              "thresholds": {"mode": "absolute", "steps": [
+                {"color": "green", "value": null}
+              ]},
+              "unit": "short",
+              "noValue": "0"
+            },
+            "overrides": []
+          },
+          "gridPos": {"h": 4, "w": 6, "x": 18, "y": 8},
+          "id": 6,
+          "options": {
+            "colorMode": "background", "graphMode": "none",
+            "justifyMode": "center", "orientation": "auto",
+            "reduceOptions": {"calcs": ["sum"], "fields": "", "values": false},
+            "textMode": "auto"
+          },
+          "targets": [{
+            "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+            "expr": "sum(pekko_sharding_entities_per_node{entity_type=\"Order\"})",
+            "legendFormat": "", "refId": "A"
+          }],
+          "title": "Total Live Entity Actors — Order",
+          "description": "Total live Order actor instances across the cluster. Each actor = one order being processed or recently active. After passivation the count drops — idle orders consume no memory.",
+          "type": "stat"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {
+                "drawStyle": "bars", "fillOpacity": 70, "lineWidth": 1,
+                "showPoints": "never", "spanNulls": false,
+                "stacking": {"group": "A", "mode": "normal"}
+              },
+              "unit": "short",
+              "min": 0
+            },
+            "overrides": []
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+          "id": 7,
+          "options": {
+            "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+            "tooltip": {"mode": "multi", "sort": "none"}
+          },
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+              "expr": "sum by (entity_type) (rate(pekko_entity_activations_total{entity_type=~\"$entity_type\"}[$__rate_interval]))",
+              "legendFormat": "{{entity_type}}",
+              "refId": "A"
+            }
+          ],
+          "title": "Entity Activation Rate (pekko_entity_activations_total)",
+          "description": "Rate of entity actors started (wake-ups from passivation or first message). Each spike = a batch of new sharded entities being created.",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {
+                "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2,
+                "showPoints": "always", "pointSize": 5, "spanNulls": true
+              },
+              "unit": "short",
+              "min": 0
+            },
+            "overrides": []
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+          "id": 8,
+          "options": {
+            "legend": {"displayMode": "table", "placement": "right", "showLegend": true,
+              "calcs": ["lastNotNull", "max"]},
+            "tooltip": {"mode": "multi", "sort": "none"}
+          },
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+              "expr": "sum by (pod, entity_type) (abs(delta(pekko_sharding_shards_per_node{entity_type=~\"$entity_type\"}[2m])))",
+              "legendFormat": "{{pod}} / {{entity_type}}",
+              "refId": "A"
+            },
+            {
+              "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+              "expr": "pekko_cluster_members_up",
+              "legendFormat": "members up ({{pod}})",
+              "refId": "B"
+            }
+          ],
+          "title": "Shard Rebalancing Signal + Cluster Members Up",
+          "description": "abs(delta(shards_per_node[2m])) spikes when shards move between nodes. Overlaid with cluster member count to correlate rebalancing with scale-up/down events.",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+          "gridPos": {"h": 10, "w": 24, "x": 0, "y": 20},
+          "id": 9,
+          "options": {
+            "dedupStrategy": "none",
+            "enableLogDetails": true,
+            "prettifyLogMessage": false,
+            "showCommonLabels": false,
+            "showLabels": true,
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": true
+          },
+          "targets": [{
+            "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+            "expr": "{namespace=\"pekko-demo\"} |~ \"[Ss]hard|[Rr]ebalanc|[Ee]ntity|entityId|Registered|Updated profile|placed order\"",
+            "queryType": "range",
+            "refId": "A"
+          }],
+          "title": "Shard & Entity Log Stream",
+          "description": "Surowy strumień logów odfiltrowany do zdarzeń shardingowych. Pozwala zobaczyć kiedy konkretna encja została po raz pierwszy stworzona, który pod obsłużył żądanie oraz kiedy zaczął się rebalancing.",
+          "type": "logs"
+        },
+        {
+          "datasource": {"type": "text"},
+          "gridPos": {"h": 9, "w": 24, "x": 0, "y": 30},
+          "id": 11,
+          "options": {
+            "content": "## How to interpret these metrics\n\n### Shards per Node (top-left graph)\nPekko partitions the entity key space into **virtual shards** (default 1000). Each shard is assigned to exactly one node. Healthy state: lines are evenly spread (each node holds a similar number of shards). Temporary spikes when the node count changes are normal **rebalancing** — Pekko automatically moves shards to restore balance.\n\n### Entity Actors per Node (top-right graph)\nEach entity (e.g. a specific user or order) is one actor in memory. An actor is **created on the first message** and **stopped after 2 min of inactivity** (passivation). Differences between nodes suggest uneven shard hits — this can be random or caused by a skewed key distribution.\n\n### Total Shards (stat panels)\nSum of active shards across the entire cluster. Grows gradually from 0 toward the configured limit as more shards receive their first message. **Does not have to equal the configured limit** — fewer means some shards have not been reached yet.\n\n### Total Live Entity Actors (stat panels)\nTotal number of actors alive right now. A sudden drop = mass passivation (idle timeout). A sudden spike = many requests hitting previously sleeping entities.\n\n### Entity Activation Rate (bottom-left graph)\nRate at which actors are woken up (activations/s). Each spike = a wave of requests to entities that were passivated or brand new. Normally low; rises after a cluster restart or a scale-out when shards are claimed by new nodes.\n\n### Rebalancing Signal (bottom-right graph)\n`abs(delta(shards_per_node[2m]))` — how many shards changed nodes in the last 2 minutes. Zero = stable cluster. A spike = active rebalancing (e.g. after `kubectl scale`). The overlaid `cluster_members_up` line shows the correlation between node count changes and rebalancing.",
+            "mode": "markdown"
+          },
+          "title": "Metrics Guide",
+          "type": "text"
+        }
+      ],
+      "refresh": "10s",
+      "schemaVersion": 38,
+      "tags": ["pekko", "sharding"],
+      "templating": {
+        "list": [
+          {
+            "current": {},
+            "hide": 0,
+            "includeAll": false,
+            "label": "Prometheus",
+            "multi": false,
+            "name": "DS_PROMETHEUS",
+            "options": [],
+            "query": "prometheus",
+            "refresh": 1,
+            "type": "datasource"
+          },
+          {
+            "current": {},
+            "hide": 0,
+            "includeAll": false,
+            "label": "Loki",
+            "multi": false,
+            "name": "DS_LOKI",
+            "options": [],
+            "query": "loki",
+            "refresh": 1,
+            "type": "datasource"
+          },
+          {
+            "allValue": ".*",
+            "current": {"selected": true, "text": "All", "value": "$__all"},
+            "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+            "definition": "label_values(pekko_sharding_shards_per_node, entity_type)",
+            "hide": 0,
+            "includeAll": true,
+            "label": "Entity Type",
+            "multi": true,
+            "name": "entity_type",
+            "options": [],
+            "query": "label_values(pekko_sharding_shards_per_node, entity_type)",
+            "refresh": 2,
+            "sort": 1,
+            "type": "query"
+          }
+        ]
+      },
+      "time": {"from": "now-30m", "to": "now"},
+      "timepicker": {},
+      "timezone": "browser",
+      "title": "Pekko \u2014 Shard Distribution",
+      "uid": "pekko-sharding-v1",
+      "version": 1
+    }
+---
+# ── Dashboard 4: HTTP Throughput ─────────────────────────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pekko-http-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  pekko-http.json: |
+    {
+      "annotations": {"list": []},
+      "description": "HTTP request throughput, latency, and error rates per service",
+      "editable": true,
+      "graphTooltip": 1,
+      "links": [],
+      "panels": [
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {"lineWidth": 2, "fillOpacity": 10},
+              "unit": "reqps"
+            }
+          },
+          "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
+          "id": 1,
+          "options": {"tooltip": {"mode": "multi"}},
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+              "expr": "sum by (service) (rate(pekko_http_requests_total[1m]))",
+              "legendFormat": "{{service}}",
+              "refId": "A"
+            }
+          ],
+          "title": "Requests / Second (by service)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {"lineWidth": 2, "fillOpacity": 10},
+              "unit": "reqps"
+            }
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+          "id": 2,
+          "options": {"tooltip": {"mode": "multi"}},
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+              "expr": "sum by (service, method) (rate(pekko_http_requests_total[1m]))",
+              "legendFormat": "{{service}} {{method}}",
+              "refId": "A"
+            }
+          ],
+          "title": "Requests / Second (by method)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {"lineWidth": 2, "fillOpacity": 10},
+              "unit": "reqps"
+            }
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+          "id": 3,
+          "options": {"tooltip": {"mode": "multi"}},
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+              "expr": "sum by (service, status) (rate(pekko_http_responses_total[1m]))",
+              "legendFormat": "{{service}} {{status}}",
+              "refId": "A"
+            }
+          ],
+          "title": "Responses / Second (by status group)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"fixedColor": "red", "mode": "fixed"},
+              "custom": {"lineWidth": 2, "fillOpacity": 15},
+              "unit": "reqps"
+            }
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+          "id": 4,
+          "options": {"tooltip": {"mode": "multi"}},
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+              "expr": "sum by (service) (rate(pekko_http_responses_errors_total[1m]))",
+              "legendFormat": "{{service}} errors",
+              "refId": "A"
+            }
+          ],
+          "title": "5xx Error Rate (by service)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {"lineWidth": 2, "fillOpacity": 10},
+              "unit": "s"
+            }
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+          "id": 5,
+          "options": {"tooltip": {"mode": "multi"}},
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+              "expr": "histogram_quantile(0.50, sum by (service, le) (rate(pekko_http_responses_duration_seconds_bucket[1m])))",
+              "legendFormat": "{{service}} p50",
+              "refId": "A"
+            },
+            {
+              "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+              "expr": "histogram_quantile(0.95, sum by (service, le) (rate(pekko_http_responses_duration_seconds_bucket[1m])))",
+              "legendFormat": "{{service}} p95",
+              "refId": "B"
+            },
+            {
+              "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+              "expr": "histogram_quantile(0.99, sum by (service, le) (rate(pekko_http_responses_duration_seconds_bucket[1m])))",
+              "legendFormat": "{{service}} p99",
+              "refId": "C"
+            }
+          ],
+          "title": "Response Latency Percentiles (p50 / p95 / p99)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {"lineWidth": 2, "fillOpacity": 10},
+              "unit": "none"
+            }
+          },
+          "gridPos": {"h": 8, "w": 24, "x": 0, "y": 24},
+          "id": 6,
+          "options": {"tooltip": {"mode": "multi"}},
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+              "expr": "sum by (service) (pekko_http_requests_active)",
+              "legendFormat": "{{service}}",
+              "refId": "A"
+            }
+          ],
+          "title": "Active Requests (in-flight)",
+          "type": "timeseries"
+        }
+      ],
+      "schemaVersion": 36,
+      "templating": {
+        "list": [
+          {
+            "hide": 2,
+            "name": "DS_PROMETHEUS",
+            "query": "prometheus",
+            "type": "datasource"
+          }
+        ]
+      },
+      "time": {"from": "now-30m", "to": "now"},
+      "timepicker": {},
+      "timezone": "browser",
+      "title": "Pekko \u2014 HTTP Throughput",
+      "uid": "pekko-http-v1",
+      "version": 1
+    }

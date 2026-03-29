@@ -1,0 +1,118 @@
+# =============================================================================
+# Pekko Cluster — Kubernetes Deployment
+#
+# Deploy:
+#   kubectl apply -f k8s/
+#
+# Scale:
+#   kubectl -n pekko-demo scale deployment pekko-cluster --replicas=5
+#
+# Watch:
+#   kubectl -n pekko-demo get pods -w
+#
+# Access management API:
+#   kubectl -n pekko-demo port-forward svc/pekko-cluster 8558:8558
+#   curl http://localhost:8558/cluster/members | jq .
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pekko-cluster
+  namespace: pekko-demo
+  labels:
+    app: pekko-cluster
+spec:
+  replicas: 3
+
+  selector:
+    matchLabels:
+      app: pekko-cluster
+
+  # Allow rolling updates — Pekko Cluster handles member changes gracefully
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+
+  template:
+    metadata:
+      labels:
+        app: pekko-cluster
+      annotations:
+        # Prometheus pod annotations (alternative to ServiceMonitor)
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: pekko-cluster   # Required for bootstrap pod discovery
+
+      # Terminate gracefully: tell Pekko to leave the cluster before the pod dies
+      terminationGracePeriodSeconds: 60
+
+      containers:
+        - name: pekko-cluster
+          image: pekko-playground:latest
+          imagePullPolicy: IfNotPresent   # Use local minikube image; change for prod
+
+          ports:
+            - name: artery
+              containerPort: 25520
+              protocol: TCP
+            - name: management
+              containerPort: 8558
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+
+          env:
+            # POD_IP is injected by Kubernetes — used as the canonical Artery hostname
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+
+            # Use the Kubernetes config overlay
+            - name: JVM_FLAGS
+              value: "-Dconfig.resource=kubernetes.conf"
+
+            # Optional: set node role via env var (extend application.conf to read this)
+            # - name: PEKKO_ROLE
+            #   value: "worker"
+
+          # Kubernetes-native health probes backed by Pekko Management endpoints
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: management
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 3
+
+          livenessProbe:
+            httpGet:
+              path: /health/alive
+              port: management
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 5
+
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+      # Spread pods across different nodes to avoid a single-node failure
+      # taking down the cluster
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: pekko-cluster

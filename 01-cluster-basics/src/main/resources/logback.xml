@@ -1,0 +1,31 @@
+<configuration>
+
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <!-- Include thread name — useful to see Pekko dispatcher threads -->
+      <pattern>%d{HH:mm:ss.SSS} %-5level [%thread] %logger{30} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <!-- Show cluster lifecycle at INFO so every join/leave is visible -->
+  <logger name="org.apache.pekko.cluster"            level="INFO"/>
+  <logger name="org.apache.pekko.cluster.sbr"        level="INFO"/>
+
+  <!-- Management and bootstrap at INFO — show discovery progress -->
+  <logger name="org.apache.pekko.management"         level="INFO"/>
+  <logger name="org.apache.pekko.discovery"          level="INFO"/>
+
+  <!-- Remoting is chatty at DEBUG; keep at WARN for clean demo output -->
+  <logger name="org.apache.pekko.remote"             level="WARN"/>
+
+  <!-- Sharding coordinator logs shard assignments — useful to watch -->
+  <logger name="org.apache.pekko.cluster.sharding"   level="INFO"/>
+
+  <!-- Our application code -->
+  <logger name="com.example"                         level="DEBUG"/>
+
+  <root level="INFO">
+    <appender-ref ref="STDOUT"/>
+  </root>
+
+</configuration>

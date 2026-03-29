@@ -1,0 +1,28 @@
+# =============================================================================
+# Prometheus ServiceMonitor — tells the Prometheus Operator (installed via
+# kube-prometheus-stack) to scrape JMX metrics from every Pekko pod.
+#
+# Requires: kube-prometheus-stack Helm chart (see install-monitoring.sh).
+# =============================================================================
+
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pekko-cluster
+  namespace: pekko-demo
+  labels:
+    # Must match the Prometheus Operator's serviceMonitorSelector.
+    # kube-prometheus-stack default: release=kube-prometheus-stack
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - pekko-demo
+  selector:
+    matchLabels:
+      app: pekko-cluster
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s

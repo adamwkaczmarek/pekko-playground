@@ -1,0 +1,88 @@
+# =============================================================================
+# FrontendService — Kubernetes resources
+#
+# Exposed via NodePort so you can reach it from outside Minikube.
+# Access: minikube service frontend -n pekko-demo --url
+# =============================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: pekko-demo
+  labels:
+    app: frontend
+spec:
+  selector:
+    app: frontend
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      nodePort: 30080
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: pekko-demo
+  labels:
+    app: frontend
+spec:
+  # Stateless — scale freely, no coordination needed
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port:   "9010"
+        prometheus.io/path:   "/metrics"
+    spec:
+      # Frontend does not need pod-list access, but uses the same SA for simplicity
+      serviceAccountName: pekko-app
+
+      containers:
+        - name: frontend
+          image: pekko-microservices:latest
+          imagePullPolicy: Never
+
+          env:
+            - name: SERVICE_NAME
+              value: frontend
+            - name: CONFIG_RESOURCE
+              value: kubernetes-frontend
+
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: jmx-exporter
+              containerPort: 9010
+
+          # Frontend is stateless (provider=local) — no management endpoint.
+          # TCP socket is sufficient: if the port is bound the service is ready.
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds:        5
+            failureThreshold:    12
+
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds:        15
+
+          resources:
+            requests:
+              cpu:    "100m"
+              memory: "256Mi"
+            limits:
+              cpu:    "500m"
+              memory: "384Mi"

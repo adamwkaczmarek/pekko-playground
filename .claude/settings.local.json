@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sbt compile:*)",
+      "Bash(java --version)",
+      "Bash(echo \"JAVA_HOME=$JAVA_HOME\")",
+      "Read(//home/adam-sml/**)",
+      "Read(//home/adam-sml/.sbt/**)",
+      "Bash(cp /home/adam-sml/Workspace/pekko-playground/src/main/scala/com/example/*.scala /home/adam-sml/Workspace/pekko-playground/01-cluster-basics/src/main/scala/com/example/)",
+      "Bash(cp /home/adam-sml/Workspace/pekko-playground/src/main/resources/* /home/adam-sml/Workspace/pekko-playground/01-cluster-basics/src/main/resources/)",
+      "Bash(cp -r /home/adam-sml/Workspace/pekko-playground/scripts /home/adam-sml/Workspace/pekko-playground/01-cluster-basics/scripts)",
+      "Bash(cp -r /home/adam-sml/Workspace/pekko-playground/k8s /home/adam-sml/Workspace/pekko-playground/01-cluster-basics/k8s)",
+      "Bash(cp -r /home/adam-sml/Workspace/pekko-playground/docker /home/adam-sml/Workspace/pekko-playground/01-cluster-basics/docker)",
+      "Bash(wait)",
+      "Bash(sbt \"02-microservices/compile\")",
+      "Bash(grep -v \"^$\")",
+      "Bash(sbt \"microservices/compile\")",
+      "Bash(chmod:*)",
+      "Bash(grep:)",
+      "Bash(find ~/.ivy2/cache/fr.davit -name *.jar)",
+      "Bash(find ~/.cache/coursier -name pekko-http-metrics*.jar)",
+      "Bash(jar tf:*)",
+      "Bash(grep -v \".class$\")",
+      "Bash(grep \".class$\")",
+      "Bash(jar xf:*)",
+      "Read(//tmp/**)",
+      "Bash(grep -v \"/$\")",
+      "Bash(/home/adam-sml/Workspace/pekko-playground/02-microservices/k8s/grafana-dashboards.yaml:*)",
+      "Bash(kubectl apply:*)",
+      "Bash(kubectl -n monitoring rollout restart deployment/grafana)",
+      "Bash(kubectl -n monitoring rollout status deployment/grafana --timeout=60s)",
+      "Bash(kubectl -n monitoring get pods)",
+      "Bash(kubectl -n pekko-demo exec user-service-7bdb7cd775-cltgf -- sh -c 'wget -qO- localhost:8081/metrics 2>/dev/null')",
+      "Bash(find ~/.cache/coursier -name simpleclient-*.jar)",
+      "Bash(kubectl:*)",
+      "Bash(grep -v \"^\\\\-\\\\-$\")"
+    ]
+  }
+}

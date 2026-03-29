@@ -1,0 +1,58 @@
+# =============================================================================
+# Two Services for the Pekko Cluster:
+#
+# 1. pekko-cluster-headless (ClusterIP: None)
+#    Used by Cluster Bootstrap for pod discovery via kubernetes-api.
+#    Also used for Artery peer-to-peer communication (each pod connects directly
+#    to the target pod IP, not the VIP).
+#
+# 2. pekko-cluster (ClusterIP)
+#    Regular service exposing the Management HTTP port.
+#    Use this for health checks, kubectl port-forward, and Prometheus scraping.
+# =============================================================================
+
+# ---- Headless service (peer discovery) --------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: pekko-cluster-headless
+  namespace: pekko-demo
+  labels:
+    app: pekko-cluster
+spec:
+  clusterIP: None        # <-- headless: DNS returns all pod IPs
+  publishNotReadyAddresses: true  # Include not-yet-ready pods during bootstrap
+  selector:
+    app: pekko-cluster
+  ports:
+    - name: artery
+      port: 25520
+      protocol: TCP
+    - name: management
+      port: 8558
+      protocol: TCP
+
+---
+# ---- ClusterIP service (management + metrics) -------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: pekko-cluster
+  namespace: pekko-demo
+  labels:
+    app: pekko-cluster
+  annotations:
+    # Tell Prometheus to scrape this service on the metrics port
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  selector:
+    app: pekko-cluster
+  ports:
+    - name: management
+      port: 8558
+      targetPort: 8558
+    - name: metrics
+      port: 9090
+      targetPort: 9090
