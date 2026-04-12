@@ -1,18 +1,22 @@
-import sbt._
-import sbt.Keys._
+import sbt.*
+import sbt.Keys.*
 
 object Versions {
-  val pekko           = "1.1.2"
-  val pekkoManagement = "1.1.0"
-  val pekkoHttp       = "1.1.0"
+  val pekko            = "1.1.2"
+  val pekkoManagement  = "1.1.0"
+  val pekkoHttp        = "1.1.0"
   val pekkoHttpMetrics = "1.0.1"
-  val logback         = "1.5.6"
-  val scalatest       = "3.2.18"
-  val scala           = "2.13.14"
+  val tapir            = "1.11.10"
+  val sttp             = "3.10.1"
+  val catsEffect       = "3.5.4"
+  val chimney          = "1.5.0"
+  val logback          = "1.5.6"
+  val scalatest        = "3.2.18"
+  val scala            = "2.13.15"
 }
 
 object Dependencies {
-  import Versions._
+  import Versions.*
 
   val clusterDeps: Seq[ModuleID] = Seq(
     "org.apache.pekko" %% "pekko-actor-typed"            % pekko,
@@ -37,6 +41,20 @@ object Dependencies {
 
   val metricsDeps: Seq[ModuleID] = Seq(
     "fr.davit" %% "pekko-http-metrics-prometheus" % Versions.pekkoHttpMetrics,
+  )
+
+  // Tapir + Netty (cats-effect) — used by the frontend (API gateway).
+  // Backends still run on Pekko HTTP.
+  val tapirDeps: Seq[ModuleID] = Seq(
+    "com.softwaremill.sttp.tapir"   %% "tapir-core"               % tapir,
+    "com.softwaremill.sttp.tapir"   %% "tapir-netty-server-cats"  % tapir,
+    "com.softwaremill.sttp.tapir"   %% "tapir-json-spray"         % tapir,
+    "com.softwaremill.sttp.tapir"   %% "tapir-prometheus-metrics" % tapir,
+    "com.softwaremill.sttp.client3" %% "core"                     % sttp,
+    "com.softwaremill.sttp.client3" %% "cats"                     % sttp,
+    "com.softwaremill.sttp.client3" %% "spray-json"               % sttp,
+    "org.typelevel"                 %% "cats-effect"              % catsEffect,
+    "io.scalaland"                  %% "chimney"                  % chimney,
   )
 
   val testDeps: Seq[ModuleID] = Seq(

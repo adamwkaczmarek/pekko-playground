@@ -1,5 +1,7 @@
 package com.example.backend.orders
 
+import com.example.backend.orders.api.{OrderDetailsDto, OrderPlaceRequest, OrderServiceApi}
+import io.scalaland.chimney.dsl._
 import org.apache.pekko.actor.typed.ActorSystem
 import org.apache.pekko.actor.typed.Scheduler
 import org.apache.pekko.cluster.sharding.typed.scaladsl.ClusterSharding
@@ -10,8 +12,6 @@ import org.apache.pekko.http.scaladsl.server.Directives._
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.stream.{Materializer, SystemMaterializer}
 import org.apache.pekko.util.Timeout
-import spray.json.DefaultJsonProtocol._
-import spray.json.RootJsonFormat
 
 import java.util.UUID
 import scala.concurrent.duration._
@@ -19,12 +19,8 @@ import scala.concurrent.{ExecutionContext, Future}
 
 object OrderRoutes {
 
-  // ── JSON formats ─────────────────────────────────────────────────────────
-
-  final case class PlaceOrderRequest(userId: String, items: List[String])
-
-  implicit val placeOrderRequestFmt: RootJsonFormat[PlaceOrderRequest]        = jsonFormat2(PlaceOrderRequest)
-  implicit val orderDetailsFmt:      RootJsonFormat[OrderEntity.OrderDetails] = jsonFormat4(OrderEntity.OrderDetails)
+  // JSON formats come from the service-owned API package.
+  import OrderServiceApi.{orderDetailsDtoFormat, orderPlaceRequestFormat}
 
   // ── Routes ───────────────────────────────────────────────────────────────
 
@@ -42,7 +38,7 @@ object OrderRoutes {
       // POST /orders — place a new order
       // Validates that the user exists by calling UserService internally,
       // then persists the order in the sharded OrderEntity.
-      (post & path("orders") & entity(as[PlaceOrderRequest])) { req =>
+      (post & path("orders") & entity(as[OrderPlaceRequest])) { req =>
         val orderId  = UUID.randomUUID().toString.take(8)
         val orderRef = sharding.entityRefFor(OrderEntity.TypeKey, orderId)
 
@@ -54,7 +50,7 @@ object OrderRoutes {
                 case StatusCodes.OK =>
                   orderRef.ask(OrderEntity.PlaceOrder(req.userId, req.items, _)).map {
                     case details: OrderEntity.OrderDetails =>
-                      complete(StatusCodes.Created -> details)
+                      complete(StatusCodes.Created -> details.transformInto[OrderDetailsDto])
                     case _ =>
                       complete(StatusCodes.InternalServerError)
                   }
@@ -77,7 +73,7 @@ object OrderRoutes {
       (get & path("orders" / Segment)) { orderId =>
         val orderRef = sharding.entityRefFor(OrderEntity.TypeKey, orderId)
         onSuccess(orderRef.ask(OrderEntity.GetOrder(_))) {
-          case details: OrderEntity.OrderDetails => complete(details)
+          case details: OrderEntity.OrderDetails => complete(details.transformInto[OrderDetailsDto])
           case OrderEntity.OrderNotFound         => complete(StatusCodes.NotFound)
         }
       }

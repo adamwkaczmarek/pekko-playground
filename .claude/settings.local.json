@@ -33,7 +33,9 @@
       "Bash(kubectl -n pekko-demo exec user-service-7bdb7cd775-cltgf -- sh -c 'wget -qO- localhost:8081/metrics 2>/dev/null')",
       "Bash(find ~/.cache/coursier -name simpleclient-*.jar)",
       "Bash(kubectl:*)",
-      "Bash(grep -v \"^\\\\-\\\\-$\")"
+      "Bash(grep -v \"^\\\\-\\\\-$\")",
+      "Bash(sbt -batch -no-colors \"microservices/Compile/compile\")",
+      "Bash(python3:*)"
     ]
   }
 }

@@ -1,26 +1,19 @@
 package com.example.frontend
 
+import cats.effect.std.Dispatcher
+import cats.effect.{ExitCode, IO, IOApp, Resource}
 import com.typesafe.config.ConfigFactory
-import org.apache.pekko.actor.BootstrapSetup
-import org.apache.pekko.actor.setup.ActorSystemSetup
-import org.apache.pekko.actor.typed.ActorSystem
-import org.apache.pekko.actor.typed.scaladsl.Behaviors
-import fr.davit.pekko.http.metrics.core.HttpMetrics._
-import fr.davit.pekko.http.metrics.core.scaladsl.server.HttpMetricsDirectives._
-import fr.davit.pekko.http.metrics.prometheus.{PrometheusRegistry, PrometheusSettings}
-import fr.davit.pekko.http.metrics.prometheus.marshalling.PrometheusMarshallers._
-import org.apache.pekko.http.scaladsl.Http
-import org.apache.pekko.http.scaladsl.server.Directives.{concat, get, path}
-
-import scala.concurrent.Await
-import scala.concurrent.duration._
+import org.slf4j.LoggerFactory
+import sttp.client3.httpclient.cats.HttpClientCatsBackend
+import sttp.tapir.server.metrics.prometheus.PrometheusMetrics
+import sttp.tapir.server.netty.cats.{NettyCatsServer, NettyCatsServerOptions}
 
 /**
  * Entry point for the FrontendService (API Gateway).
  *
- * This is a STATELESS service — no Pekko Cluster, no Sharding.
- * It only proxies HTTP requests to the appropriate backend service.
- * Multiple instances can run behind a load balancer without coordination.
+ * Stateless API gateway built on Tapir + Netty (cats-effect).
+ * No Pekko ActorSystem, no Pekko HTTP — the frontend can be scaled horizontally
+ * by Kubernetes without any cluster coordination.
  *
  * Start:
  *   sbt "microservices/runMain com.example.frontend.FrontendApp"
@@ -30,41 +23,47 @@ import scala.concurrent.duration._
  *   GET  /users/{id}   → UserService
  *   POST /orders       → OrderService
  *   GET  /orders/{id}  → OrderService
+ *   GET  /metrics      → Prometheus scrape endpoint
  */
-object FrontendApp extends App {
+object FrontendApp extends IOApp {
 
-  val configName = sys.env.getOrElse("CONFIG_RESOURCE", "frontend")
-  val config = ConfigFactory.load(configName)
+  private val log = LoggerFactory.getLogger(getClass)
 
-  // No cluster — provider is "local".
-  // Frontend can be scaled horizontally by Kubernetes without any cluster coordination.
-  implicit val system: ActorSystem[Nothing] = ActorSystem[Nothing](
-    Behaviors.empty[Nothing],
-    "FrontendSystem",
-    ActorSystemSetup.create(BootstrapSetup().withConfig(config))
-  )
+  override def run(args: List[String]): IO[ExitCode] = {
+    val configName      = sys.env.getOrElse("CONFIG_RESOURCE", "frontend")
+    val config          = ConfigFactory.load(configName)
+    val port            = config.getInt("frontend.http.port")
+    val userServiceUrl  = config.getString("user-service.base-url")
+    val orderServiceUrl = config.getString("order-service.base-url")
 
-  val metricsRegistry = PrometheusRegistry(settings = PrometheusSettings.default
-    .withIncludeMethodDimension(true)
-    .withIncludeStatusDimension(true)
-  )
+    val prometheusMetrics = PrometheusMetrics.default[IO]()
 
-  val port = config.getInt("frontend.http.port")
-  val routes = concat(
-    path("metrics") {
-      get {
-        metrics(metricsRegistry)
+    val resources: Resource[IO, (sttp.client3.SttpBackend[IO, Any], NettyCatsServer[IO])] =
+      for {
+        sttpBackend <- HttpClientCatsBackend.resource[IO]()
+        dispatcher  <- Dispatcher.parallel[IO]
+      } yield {
+        val opts: NettyCatsServerOptions[IO] =
+          NettyCatsServerOptions
+            .customiseInterceptors[IO](dispatcher)
+            .metricsInterceptor(prometheusMetrics.metricsInterceptor())
+            .options
+        (sttpBackend, NettyCatsServer[IO](opts))
       }
-    },
-    FrontendRoutes()
-  )
-  Http().newMeteredServerAt("0.0.0.0", port, metricsRegistry).bind(routes)
-  system.log.info("Frontend listening on port {} (external, /metrics available)", port)
 
-  sys.addShutdownHook {
-    system.log.info("Frontend shutting down...")
-    system.terminate()
+    resources.use { case (sttpBackend, server) =>
+      val routes       = FrontendRoutes(sttpBackend, userServiceUrl, orderServiceUrl)
+      val allEndpoints = routes :+ prometheusMetrics.metricsEndpoint
+
+      server
+        .host("0.0.0.0")
+        .port(port)
+        .addEndpoints(allEndpoints)
+        .start()
+        .flatMap { binding =>
+          IO(log.info("Frontend listening on port {} (Tapir/Netty, /metrics available)", binding.port)) >>
+            IO.never.as(ExitCode.Success)
+        }
+    }
   }
-
-  Await.ready(system.whenTerminated, Duration.Inf)
 }

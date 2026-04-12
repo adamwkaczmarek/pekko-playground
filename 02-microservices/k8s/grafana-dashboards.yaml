@@ -456,7 +456,7 @@ data:
               "legendFormat": "tx \u2191 {{service}}", "refId": "B"
             }
           ],
-          "title": "HTTP Bandwidth per Service (request/response body bytes)",
+          "title": "HTTP Bandwidth per Service (backends only — frontend on Tapir/Netty does not export body size)",
           "type": "timeseries"
         }
       ],
@@ -535,7 +535,7 @@ data:
             }
           ],
           "title": "Shards per Node  (pekko_sharding_shards_per_node)",
-          "description": "How many shards each pod is currently hosting. Equal distribution means good load balancing. Spikes indicate rebalancing in progress.",
+          "description": "Number of shards with at least one live entity actor on each pod (from ShardRegion.GetShardRegionStats). This only counts active shards — shards allocated to a node but with all entities passivated will NOT appear here. A drop to zero after idle periods is normal and does not indicate rebalancing. Equal distribution across pods means good load balancing.",
           "type": "timeseries"
         },
         {
@@ -568,7 +568,7 @@ data:
             }
           ],
           "title": "Entity Actors per Node  (pekko_sharding_entities_per_node)",
-          "description": "Live entity actors on each pod. After passivation timeout actors are stopped and the count drops. A hot pod with many actors may indicate skewed shard allocation.",
+          "description": "Number of live (non-passivated) entity actors on each pod (sum of entity counts across active shards from ShardRegion.GetShardRegionStats). Actors are stopped after the passivation timeout (default 2 min of inactivity), so this value drops during idle periods. A persistently hot pod may indicate skewed shard allocation or hot-key traffic.",
           "type": "timeseries"
         },
         {
@@ -589,7 +589,7 @@ data:
           "options": {
             "colorMode": "background", "graphMode": "none",
             "justifyMode": "center", "orientation": "auto",
-            "reduceOptions": {"calcs": ["sum"], "fields": "", "values": false},
+            "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
             "textMode": "auto"
           },
           "targets": [{
@@ -598,7 +598,7 @@ data:
             "legendFormat": "", "refId": "A"
           }],
           "title": "Total Shards — User",
-          "description": "Total active User shards summed across all nodes. Pekko partitions the entity key space into virtual shards (default 1000). A shard becomes active when it hosts at least one message or actor. The value grows gradually as new users receive their first request.",
+          "description": "Sum of active User shards across all nodes (= sum of 'Shards per Node' lines for User). Only counts shards with at least one live actor — NOT the total number of configured virtual shards. Drops during idle periods as actors passivate and their shards become empty.",
           "type": "stat"
         },
         {
@@ -619,7 +619,7 @@ data:
           "options": {
             "colorMode": "background", "graphMode": "none",
             "justifyMode": "center", "orientation": "auto",
-            "reduceOptions": {"calcs": ["sum"], "fields": "", "values": false},
+            "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
             "textMode": "auto"
           },
           "targets": [{
@@ -628,7 +628,7 @@ data:
             "legendFormat": "", "refId": "A"
           }],
           "title": "Total Live Entity Actors — User",
-          "description": "Total live User actor instances across the entire cluster. Each actor = one active user. Actors are stopped after 2 min of inactivity (passivation) — the count drops when that happens. High values indicate many concurrent sessions.",
+          "description": "Sum of live (non-passivated) User actor instances across all nodes (= sum of 'Entity Actors per Node' lines for User). Each actor represents one recently active user. Actors are stopped after the passivation timeout (default 2 min idle), so this reflects current concurrency, not total registered users.",
           "type": "stat"
         },
         {
@@ -649,7 +649,7 @@ data:
           "options": {
             "colorMode": "background", "graphMode": "none",
             "justifyMode": "center", "orientation": "auto",
-            "reduceOptions": {"calcs": ["sum"], "fields": "", "values": false},
+            "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
             "textMode": "auto"
           },
           "targets": [{
@@ -658,7 +658,7 @@ data:
             "legendFormat": "", "refId": "A"
           }],
           "title": "Total Shards — Order",
-          "description": "Total active Order shards summed across all nodes. Same as for User — a shard becomes active when the first order assigned to it is processed.",
+          "description": "Sum of active Order shards across all nodes (= sum of 'Shards per Node' lines for Order). Only counts shards with at least one live actor — NOT the total number of configured virtual shards. Drops during idle periods as actors passivate and their shards become empty.",
           "type": "stat"
         },
         {
@@ -679,7 +679,7 @@ data:
           "options": {
             "colorMode": "background", "graphMode": "none",
             "justifyMode": "center", "orientation": "auto",
-            "reduceOptions": {"calcs": ["sum"], "fields": "", "values": false},
+            "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
             "textMode": "auto"
           },
           "targets": [{
@@ -688,7 +688,7 @@ data:
             "legendFormat": "", "refId": "A"
           }],
           "title": "Total Live Entity Actors — Order",
-          "description": "Total live Order actor instances across the cluster. Each actor = one order being processed or recently active. After passivation the count drops — idle orders consume no memory.",
+          "description": "Sum of live (non-passivated) Order actor instances across all nodes (= sum of 'Entity Actors per Node' lines for Order). Each actor represents one recently active order. Actors are stopped after the passivation timeout (default 2 min idle), so this reflects in-flight orders, not total orders ever placed.",
           "type": "stat"
         },
         {
@@ -854,7 +854,7 @@ data:
       "version": 1
     }
 ---
-# ── Dashboard 4: HTTP Throughput ─────────────────────────────────────────────
+# ── Dashboard 4: HTTP Throughput (Pekko HTTP backends + Tapir/Netty frontend) ─
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -886,7 +886,7 @@ data:
           "targets": [
             {
               "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
-              "expr": "sum by (service) (rate(pekko_http_requests_total[1m]))",
+              "expr": "sum by (service) (rate(pekko_http_requests_total[1m])) or sum by (service) (rate(tapir_request_total[1m]))",
               "legendFormat": "{{service}}",
               "refId": "A"
             }
@@ -909,7 +909,7 @@ data:
           "targets": [
             {
               "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
-              "expr": "sum by (service, method) (rate(pekko_http_requests_total[1m]))",
+              "expr": "sum by (service, method) (rate(pekko_http_requests_total[1m])) or sum by (service, method) (rate(tapir_request_total[1m]))",
               "legendFormat": "{{service}} {{method}}",
               "refId": "A"
             }
@@ -932,7 +932,7 @@ data:
           "targets": [
             {
               "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
-              "expr": "sum by (service, status) (rate(pekko_http_responses_total[1m]))",
+              "expr": "sum by (service, status) (rate(pekko_http_responses_total[1m])) or sum by (service, status) (rate(tapir_request_total[1m]))",
               "legendFormat": "{{service}} {{status}}",
               "refId": "A"
             }
@@ -955,7 +955,7 @@ data:
           "targets": [
             {
               "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
-              "expr": "sum by (service) (rate(pekko_http_responses_errors_total[1m]))",
+              "expr": "sum by (service) (rate(pekko_http_responses_errors_total[1m])) or sum by (service) (rate(tapir_request_total{status=~\"5..\"}[1m]))",
               "legendFormat": "{{service}} errors",
               "refId": "A"
             }
@@ -978,19 +978,19 @@ data:
           "targets": [
             {
               "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
-              "expr": "histogram_quantile(0.50, sum by (service, le) (rate(pekko_http_responses_duration_seconds_bucket[1m])))",
+              "expr": "histogram_quantile(0.50, sum by (service, le) (rate(pekko_http_responses_duration_seconds_bucket[1m]))) or histogram_quantile(0.50, sum by (service, le) (rate(tapir_request_duration_seconds_bucket[1m])))",
               "legendFormat": "{{service}} p50",
               "refId": "A"
             },
             {
               "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
-              "expr": "histogram_quantile(0.95, sum by (service, le) (rate(pekko_http_responses_duration_seconds_bucket[1m])))",
+              "expr": "histogram_quantile(0.95, sum by (service, le) (rate(pekko_http_responses_duration_seconds_bucket[1m]))) or histogram_quantile(0.95, sum by (service, le) (rate(tapir_request_duration_seconds_bucket[1m])))",
               "legendFormat": "{{service}} p95",
               "refId": "B"
             },
             {
               "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
-              "expr": "histogram_quantile(0.99, sum by (service, le) (rate(pekko_http_responses_duration_seconds_bucket[1m])))",
+              "expr": "histogram_quantile(0.99, sum by (service, le) (rate(pekko_http_responses_duration_seconds_bucket[1m]))) or histogram_quantile(0.99, sum by (service, le) (rate(tapir_request_duration_seconds_bucket[1m])))",
               "legendFormat": "{{service}} p99",
               "refId": "C"
             }
@@ -1013,7 +1013,7 @@ data:
           "targets": [
             {
               "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
-              "expr": "sum by (service) (pekko_http_requests_active)",
+              "expr": "sum by (service) (pekko_http_requests_active) or sum by (service) (tapir_request_active)",
               "legendFormat": "{{service}}",
               "refId": "A"
             }
@@ -1036,7 +1036,7 @@ data:
       "time": {"from": "now-30m", "to": "now"},
       "timepicker": {},
       "timezone": "browser",
-      "title": "Pekko \u2014 HTTP Throughput",
+      "title": "HTTP Throughput",
       "uid": "pekko-http-v1",
       "version": 1
     }

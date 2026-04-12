@@ -1,5 +1,7 @@
 package com.example.backend.users
 
+import com.example.backend.users.api.{UserProfileDto, UserRegisterRequest, UserServiceApi}
+import io.scalaland.chimney.dsl._
 import org.apache.pekko.actor.typed.ActorSystem
 import org.apache.pekko.actor.typed.Scheduler
 import org.apache.pekko.actor.typed.scaladsl.AskPattern._
@@ -9,8 +11,6 @@ import org.apache.pekko.http.scaladsl.model.StatusCodes
 import org.apache.pekko.http.scaladsl.server.Directives._
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.util.Timeout
-import spray.json.DefaultJsonProtocol._
-import spray.json.RootJsonFormat
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -18,12 +18,8 @@ import scala.util.{Failure, Success}
 
 object UserRoutes {
 
-  // ── JSON formats ─────────────────────────────────────────────────────────
-
-  final case class RegisterRequest(name: String, email: String)
-
-  implicit val registerRequestFmt: RootJsonFormat[RegisterRequest]        = jsonFormat2(RegisterRequest)
-  implicit val userProfileFmt:     RootJsonFormat[UserEntity.UserProfile] = jsonFormat3(UserEntity.UserProfile)
+  // JSON formats come from the service-owned API package.
+  import UserServiceApi.{userProfileDtoFormat, userRegisterRequestFormat}
 
   // ── Routes ───────────────────────────────────────────────────────────────
 
@@ -41,16 +37,16 @@ object UserRoutes {
         // StatusReply.error → 404, StatusReply.success → 200
         (get & pathEnd) {
           onComplete(userRef.askWithStatus(UserEntity.GetProfile(_))) {
-            case Success(profile) => complete(profile)
+            case Success(profile) => complete(profile.transformInto[UserProfileDto])
             case Failure(_)       => complete(StatusCodes.NotFound)
           }
         },
 
         // POST /users/{userId}
         // StatusReply.success → 201 with profile body
-        (post & pathEnd & entity(as[RegisterRequest])) { req =>
+        (post & pathEnd & entity(as[UserRegisterRequest])) { req =>
           onSuccess(userRef.askWithStatus(UserEntity.Register(req.name, req.email, _))) { profile =>
-            complete(StatusCodes.Created -> profile)
+            complete(StatusCodes.Created -> profile.transformInto[UserProfileDto])
           }
         }
       )

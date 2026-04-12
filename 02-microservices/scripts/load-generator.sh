@@ -55,7 +55,7 @@ info "Successfully registered ${#REGISTERED_USERS[@]} users."
 
 # ── Phase 2: Place orders ─────────────────────────────────────────────────────
 info "Placing orders (${ORDERS_PER_USER_MIN}-${ORDERS_PER_USER_MAX} per user)..."
-declare -a ORDER_IDS
+ORDER_IDS=()
 TOTAL_ORDERS=0
 
 for USER_ID in "${REGISTERED_USERS[@]}"; do
@@ -66,7 +66,7 @@ for USER_ID in "${REGISTERED_USERS[@]}"; do
     RESPONSE=$(curl -sf \
       -X POST "${BASE_URL}/orders" \
       -H "Content-Type: application/json" \
-      -d "{\"userId\": \"${USER_ID}\", \"items\": [\"${ITEM1}\", \"${ITEM2}\"]}" \
+      -d "{\"customerId\": \"${USER_ID}\", \"products\": [\"${ITEM1}\", \"${ITEM2}\"]}" \
       || echo '{}')
 
     ORDER_ID=$(echo "$RESPONSE" | grep -o '"orderId":"[^"]*"' | cut -d'"' -f4 || true)
@@ -113,7 +113,7 @@ while true; do
     ITEM=$(random_item)
     curl -sf -X POST "${BASE_URL}/orders" \
       -H "Content-Type: application/json" \
-      -d "{\"userId\": \"${USER}\", \"items\": [\"${ITEM}\"]}" \
+      -d "{\"customerId\": \"${USER}\", \"products\": [\"${ITEM}\"]}" \
       -o /dev/null || true
     info "Round ${ROUND} — new order placed for ${USER}"
   fi

@@ -14,7 +14,7 @@ lazy val microservices = (project in file("02-microservices"))
     name                   := "02-microservices",
     settings,
     Compile / mainClass    := Some("com.example.frontend.FrontendApp"),
-    libraryDependencies   ++= clusterDeps ++ managementDeps ++ httpDeps ++ metricsDeps ++ testDeps,
+    libraryDependencies   ++= clusterDeps ++ managementDeps ++ httpDeps ++ metricsDeps ++ tapirDeps ++ testDeps,
     dockerBaseImage        := "eclipse-temurin:17-jre-jammy",
   )
 
