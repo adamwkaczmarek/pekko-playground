@@ -19,8 +19,6 @@
 import http from "k6/http";
 import { check, sleep } from "k6";
 import { SharedArray } from "k6/data";
-import { Counter, Trend } from "k6/metrics";
-
 // ── Configuration ───────────────────────────────────────────────────────────
 
 const BASE_URL  = __ENV.FRONTEND_URL || "http://localhost:8080";
@@ -47,12 +45,6 @@ const userIds = new SharedArray("userIds", function () {
   }
   return ids;
 });
-
-// ── Custom metrics ──────────────────────────────────────────────────────────
-
-const registeredUsers = new Counter("registered_users");
-const placedOrders    = new Counter("placed_orders");
-const orderLatency    = new Trend("order_place_duration", true);
 
 // ── Scenarios ───────────────────────────────────────────────────────────────
 
@@ -112,11 +104,9 @@ export function registerUser() {
     { headers: { "Content-Type": "application/json" }, tags: { endpoint: "POST /users" } },
   );
 
-  const ok = check(res, {
+  check(res, {
     "user registered (201)": (r) => r.status === 201,
   });
-
-  if (ok) registeredUsers.add(1);
   sleep(0.05);
 }
 
@@ -137,14 +127,9 @@ export function placeOrders() {
       tags: { endpoint: "POST /orders" },
     });
 
-    const ok = check(res, {
+    check(res, {
       "order placed (201)": (r) => r.status === 201,
     });
-
-    if (ok) {
-      placedOrders.add(1);
-      orderLatency.add(res.timings.duration);
-    }
     sleep(0.02);
   }
 }
