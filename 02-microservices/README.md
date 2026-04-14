@@ -78,11 +78,11 @@ by calling UserService over HTTP (backend-to-backend).
 ```
 External Client
   │
-  │ POST :8080/orders {"userId": "jan", "items": ["shoe"]}
+  │ POST :8080/orders {"customerId": "jan", "products": ["shoe"]}
   ▼
-FrontendService                     ← rewrites URI and forwards
+FrontendService                     ← translates frontend DTO → backend DTO
   │
-  │ POST :8082/orders (internal)
+  │ POST :8082/orders {"userId": "jan", "items": ["shoe"]}  (internal)
   ▼
 OrderService
   │
@@ -96,7 +96,7 @@ OrderService
   │
   │ ask → OrderEntity("a1b2c3d4")  ← state stored in sharded actor
   ▼
-Client ← 201 Created {"orderId": "a1b2c3d4", "status": "placed", ...}
+Client ← 201 Created {"orderId": "a1b2c3d4", "state": "placed", ...}
 ```
 
 ---
@@ -134,10 +134,10 @@ curl -s -X POST http://localhost:8080/users/jan \
 # 2. Get profile
 curl -s http://localhost:8080/users/jan | jq .
 
-# 3. Place an order
+# 3. Place an order (frontend uses customerId / products)
 curl -s -X POST http://localhost:8080/orders \
   -H "Content-Type: application/json" \
-  -d '{"userId": "jan", "items": ["shoe-42", "hat-L"]}' | jq .
+  -d '{"customerId": "jan", "products": ["shoe-42", "hat-L"]}' | jq .
 
 # 4. Get order (use orderId from previous response)
 curl -s http://localhost:8080/orders/<orderId> | jq .
@@ -145,7 +145,7 @@ curl -s http://localhost:8080/orders/<orderId> | jq .
 # 5. Try placing an order without registering first (→ 400)
 curl -s -X POST http://localhost:8080/orders \
   -H "Content-Type: application/json" \
-  -d '{"userId": "ghost", "items": ["x"]}' | jq .
+  -d '{"customerId": "ghost", "products": ["x"]}' | jq .
 ```
 
 ---
@@ -172,14 +172,26 @@ curl http://localhost:8568/cluster/members | jq .
     ├── scala/com/example/
     │   ├── CborSerializable.scala              # Marker trait for cluster messages
     │   ├── frontend/
-    │   │   ├── FrontendRoutes.scala            # Proxy: rewrites URI and forwards request
+    │   │   ├── api/
+    │   │   │   ├── FrontendUserApi.scala       # Public user contract (Tapir endpoints + DTOs)
+    │   │   │   └── FrontendOrderApi.scala      # Public order contract (Tapir endpoints + DTOs)
+    │   │   ├── mapping/
+    │   │   │   ├── UserMapping.scala           # Frontend ↔ backend DTO translation (Chimney)
+    │   │   │   └── OrderMapping.scala          # Frontend ↔ backend DTO translation (Chimney)
+    │   │   ├── FrontendRoutes.scala            # Tapir server endpoints — calls backends via sttp
     │   │   └── FrontendApp.scala               # Main: stateless, provider=local, port 8080
     │   └── backend/
+    │       ├── ShardingMetrics.scala            # Prometheus gauges for sharding stats
+    │       ├── ShardStatsPoller.scala           # Polls ShardRegion and updates gauges
     │       ├── users/
+    │       │   ├── api/
+    │       │   │   └── UserServiceApi.scala    # Backend user wire contract (DTOs + JSON formats)
     │       │   ├── UserEntity.scala            # Sharded user entity
     │       │   ├── UserRoutes.scala            # HTTP routes (GET/POST /users/{id})
     │       │   └── UserServiceApp.scala        # Main: cluster + HTTP, port 8081
     │       └── orders/
+    │           ├── api/
+    │           │   └── OrderServiceApi.scala   # Backend order wire contract (DTOs + JSON formats)
     │           ├── OrderEntity.scala           # Sharded order entity
     │           ├── OrderRoutes.scala           # HTTP routes + UserService verification
     │           └── OrderServiceApp.scala       # Main: cluster + HTTP, port 8082
@@ -247,15 +259,29 @@ Grafana:       http://<minikube-ip>:30300   (admin / admin)
 
 Minikube address: `minikube ip`
 
-### Generating traffic
+### Generating traffic (k6)
+
+Install k6: `brew install k6` (macOS) or `sudo apt install k6` (Linux).
 
 ```bash
-FRONTEND_URL=http://$(minikube ip):30080 ./scripts/load-generator.sh
+# Run with Prometheus remote write (metrics visible in Grafana k6 dashboard):
+K6_PROMETHEUS_RW_SERVER_URL=http://$(minikube ip):30090/api/v1/write \
+K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM=false \
+K6_PROMETHEUS_RW_TREND_STATS=p\(50\),p\(90\),p\(95\),p\(99\),min,max,avg \
+  k6 run -o experimental-prometheus-rw \
+  -e FRONTEND_URL=http://$(minikube ip):30080 \
+  k6/load-test.js
+
+# Or run without Prometheus (console output only):
+k6 run -e FRONTEND_URL=http://$(minikube ip):30080 k6/load-test.js
 ```
 
-The script registers 50 users, places ~150 orders, then continuously
-queries random entities — triggering shard creation and entity activation
-across different nodes.
+The test has 3 scenarios:
+1. **register_users** — registers 50 users (10 VUs, shared-iterations)
+2. **place_orders** — places 2-5 orders per user (starts after 30s)
+3. **steady_traffic** — continuous mixed read/write polling (5 VUs, 10 min)
+
+Results are visible in the **Pekko — k6 Load Test** Grafana dashboard.
 
 ### Observing sharding
 
@@ -329,15 +355,18 @@ and override only what differs in K8s:
 02-microservices/
 ├── Dockerfile                          # Multi-stage build (sbt builder + JRE runtime)
 ├── entrypoint.sh                       # SERVICE_NAME dispatcher
+├── k6/
+│   └── load-test.js                    # k6 load test (3 scenarios, Prometheus remote write)
 ├── k8s/
 │   ├── namespace.yaml                  # namespace: pekko-demo
 │   ├── rbac.yaml                       # ServiceAccount + Role for listing pods
 │   ├── user-service.yaml               # Service (8081) + Deployment (3 replicas)
 │   ├── order-service.yaml              # Service (8082) + Deployment (3 replicas)
-│   └── frontend.yaml                   # NodePort Service (30080) + Deployment
+│   ├── frontend.yaml                   # NodePort Service (30080) + Deployment
+│   ├── podmonitors.yaml                # PodMonitor CRDs for Prometheus scraping
+│   └── grafana-dashboards.yaml         # 5 dashboards: logs, metrics, sharding, HTTP, k6
 ├── scripts/
-│   ├── deploy.sh                       # One-shot Minikube deployment
-│   └── load-generator.sh              # Traffic generator (50 users, ~150 orders)
+│   └── deploy.sh                       # One-shot Minikube deployment
 └── src/main/resources/
     ├── kubernetes-user-service.conf    # K8s overrides: POD_IP, bootstrap, discovery
     ├── kubernetes-order-service.conf   # K8s overrides + user-service DNS name

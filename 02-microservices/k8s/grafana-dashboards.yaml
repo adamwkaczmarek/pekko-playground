@@ -1040,3 +1040,329 @@ data:
       "uid": "pekko-http-v1",
       "version": 1
     }
+---
+# ── Dashboard 5: k6 Load Test Results ────────────────────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pekko-k6-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  pekko-k6.json: |
+    {
+      "annotations": {"list": []},
+      "description": "k6 load test metrics pushed via Prometheus remote write",
+      "editable": true,
+      "graphTooltip": 1,
+      "links": [],
+      "panels": [
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {"lineWidth": 2, "fillOpacity": 15, "spanNulls": true},
+              "unit": "reqps"
+            }
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+          "id": 1,
+          "options": {
+            "legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"]},
+            "tooltip": {"mode": "multi", "sort": "desc"}
+          },
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+              "expr": "sum by (endpoint) (rate(k6_http_reqs_total{endpoint=~\".+\"}[$__rate_interval]))",
+              "legendFormat": "{{endpoint}}",
+              "refId": "A"
+            }
+          ],
+          "title": "Requests / Second (by endpoint)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {"lineWidth": 2, "fillOpacity": 15, "spanNulls": true},
+              "unit": "ms"
+            }
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+          "id": 2,
+          "options": {
+            "legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull"]},
+            "tooltip": {"mode": "multi", "sort": "desc"}
+          },
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+              "expr": "k6_http_req_duration_p50",
+              "legendFormat": "p50",
+              "refId": "A"
+            },
+            {
+              "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+              "expr": "k6_http_req_duration_p90",
+              "legendFormat": "p90",
+              "refId": "B"
+            },
+            {
+              "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+              "expr": "k6_http_req_duration_p95",
+              "legendFormat": "p95",
+              "refId": "C"
+            },
+            {
+              "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+              "expr": "k6_http_req_duration_p99",
+              "legendFormat": "p99",
+              "refId": "D"
+            }
+          ],
+          "title": "Response Time Percentiles (p50 / p90 / p95 / p99)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"fixedColor": "red", "mode": "fixed"},
+              "custom": {"lineWidth": 2, "fillOpacity": 20, "spanNulls": true},
+              "unit": "percentunit",
+              "max": 1
+            }
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+          "id": 3,
+          "options": {
+            "legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"]},
+            "tooltip": {"mode": "multi", "sort": "desc"}
+          },
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+              "expr": "sum by (endpoint) (rate(k6_http_req_failed_total{endpoint=~\".+\"}[$__rate_interval])) / sum by (endpoint) (rate(k6_http_reqs_total{endpoint=~\".+\"}[$__rate_interval]))",
+              "legendFormat": "{{endpoint}}",
+              "refId": "A"
+            }
+          ],
+          "title": "Error Rate (by endpoint)",
+          "description": "Fraction of requests that returned a non-2xx status or failed a k6 check.",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {"lineWidth": 2, "fillOpacity": 25, "spanNulls": true},
+              "unit": "short"
+            }
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+          "id": 4,
+          "options": {
+            "legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"]},
+            "tooltip": {"mode": "multi", "sort": "desc"}
+          },
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+              "expr": "k6_vus",
+              "legendFormat": "Active VUs",
+              "refId": "A"
+            }
+          ],
+          "title": "Virtual Users (active)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {"lineWidth": 2, "fillOpacity": 15, "spanNulls": true},
+              "unit": "ms"
+            }
+          },
+          "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+          "id": 5,
+          "options": {
+            "legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"]},
+            "tooltip": {"mode": "multi", "sort": "desc"}
+          },
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+              "expr": "k6_iteration_duration_p95{scenario=~\"$scenario\"}",
+              "legendFormat": "{{scenario}} p95",
+              "refId": "A"
+            },
+            {
+              "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+              "expr": "k6_iteration_duration_p99{scenario=~\"$scenario\"}",
+              "legendFormat": "{{scenario}} p99",
+              "refId": "B"
+            }
+          ],
+          "title": "Iteration Duration by Scenario (p95 / p99)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "thresholds"},
+              "thresholds": {"mode": "absolute", "steps": [
+                {"color": "green", "value": null},
+                {"color": "red", "value": 0.1}
+              ]},
+              "unit": "percentunit",
+              "noValue": "0"
+            }
+          },
+          "gridPos": {"h": 4, "w": 6, "x": 0, "y": 24},
+          "id": 6,
+          "options": {
+            "colorMode": "background", "graphMode": "none",
+            "justifyMode": "center", "orientation": "auto",
+            "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+            "textMode": "auto"
+          },
+          "targets": [{
+            "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+            "expr": "sum(rate(k6_http_req_failed_total[$__rate_interval])) / sum(rate(k6_http_reqs_total[$__rate_interval]))",
+            "legendFormat": "", "refId": "A"
+          }],
+          "title": "Overall Error Rate",
+          "type": "stat"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "thresholds"},
+              "thresholds": {"mode": "absolute", "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 1000},
+                {"color": "red", "value": 3000}
+              ]},
+              "unit": "ms",
+              "noValue": "0"
+            }
+          },
+          "gridPos": {"h": 4, "w": 6, "x": 6, "y": 24},
+          "id": 7,
+          "options": {
+            "colorMode": "background", "graphMode": "none",
+            "justifyMode": "center", "orientation": "auto",
+            "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+            "textMode": "auto"
+          },
+          "targets": [{
+            "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+            "expr": "k6_http_req_duration_p95",
+            "legendFormat": "", "refId": "A"
+          }],
+          "title": "p95 Latency",
+          "type": "stat"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "thresholds"},
+              "thresholds": {"mode": "absolute", "steps": [
+                {"color": "blue", "value": null}
+              ]},
+              "unit": "short",
+              "noValue": "0"
+            }
+          },
+          "gridPos": {"h": 4, "w": 6, "x": 12, "y": 24},
+          "id": 8,
+          "options": {
+            "colorMode": "background", "graphMode": "none",
+            "justifyMode": "center", "orientation": "auto",
+            "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+            "textMode": "auto"
+          },
+          "targets": [{
+            "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+            "expr": "k6_registered_users",
+            "legendFormat": "", "refId": "A"
+          }],
+          "title": "Registered Users",
+          "type": "stat"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "thresholds"},
+              "thresholds": {"mode": "absolute", "steps": [
+                {"color": "blue", "value": null}
+              ]},
+              "unit": "short",
+              "noValue": "0"
+            }
+          },
+          "gridPos": {"h": 4, "w": 6, "x": 18, "y": 24},
+          "id": 9,
+          "options": {
+            "colorMode": "background", "graphMode": "none",
+            "justifyMode": "center", "orientation": "auto",
+            "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+            "textMode": "auto"
+          },
+          "targets": [{
+            "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+            "expr": "k6_placed_orders",
+            "legendFormat": "", "refId": "A"
+          }],
+          "title": "Placed Orders",
+          "type": "stat"
+        }
+      ],
+      "refresh": "5s",
+      "schemaVersion": 38,
+      "tags": ["k6", "load-test"],
+      "templating": {
+        "list": [
+          {
+            "hide": 2,
+            "name": "DS_PROMETHEUS",
+            "query": "prometheus",
+            "type": "datasource"
+          },
+          {
+            "allValue": ".*",
+            "current": {"selected": true, "text": "All", "value": "$__all"},
+            "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+            "definition": "label_values(k6_iteration_duration, scenario)",
+            "hide": 0,
+            "includeAll": true,
+            "label": "Scenario",
+            "multi": true,
+            "name": "scenario",
+            "options": [],
+            "query": "label_values(k6_iteration_duration, scenario)",
+            "refresh": 2,
+            "sort": 1,
+            "type": "query"
+          }
+        ]
+      },
+      "time": {"from": "now-30m", "to": "now"},
+      "timepicker": {},
+      "timezone": "browser",
+      "title": "Pekko \u2014 k6 Load Test",
+      "uid": "pekko-k6-v1",
+      "version": 1
+    }

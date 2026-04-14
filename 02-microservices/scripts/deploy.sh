@@ -81,6 +81,9 @@ helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheu
   --set grafana.adminPassword=admin \
   --set grafana.service.type=NodePort \
   --set grafana.service.nodePort=30300 \
+  --set prometheus.service.type=NodePort \
+  --set prometheus.service.nodePort=30090 \
+  --set prometheus.prometheusSpec.enableRemoteWriteReceiver=true \
   --wait --timeout 5m
 
 # ── 4. Install Loki + Promtail (loki-stack — dev-friendly single-binary) ──────
@@ -153,6 +156,11 @@ echo "║  Shard allocation:                                           ║"
 echo "║    kubectl -n ${NAMESPACE} exec -it deploy/user-service \\   "
 echo "║      -- curl -s localhost:8558/cluster/shards/User          "
 echo "╠══════════════════════════════════════════════════════════════╣"
-echo "║  Generate load:                                              ║"
-echo "║    FRONTEND_URL=${FRONTEND_URL} ./scripts/load-generator.sh "
+echo "║  k6 load test (install: brew install k6 / apt install k6):    ║"
+echo "║    K6_PROMETHEUS_RW_SERVER_URL=http://${MINIKUBE_IP}:30090/api/v1/write \\"
+echo "║    K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM=false \\       "
+echo "║    K6_PROMETHEUS_RW_TREND_STATS=p(50),p(90),p(95),p(99),min,max,avg \\"
+echo "║      k6 run -o experimental-prometheus-rw \\                 "
+echo "║      -e FRONTEND_URL=${FRONTEND_URL} k6/load-test.js        "
+echo "║  Prometheus:     http://${MINIKUBE_IP}:30090                 "
 echo "╚══════════════════════════════════════════════════════════════╝"
